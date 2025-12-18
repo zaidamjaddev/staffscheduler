@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Portal - Social Organisation for Unity & Leisure</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Organization Header -->
+    <header class="org-header">
+        <div class="org-header-content">
+            <div class="org-logo-container">
+                <img
+                src="{{ url_for('static', filename='logo.jpeg') }}"
+                alt="Organization Logo"
+                class="org-logo"
+                id="org-logo-img"
+            />
+            
+                <div class="org-logo-placeholder" id="logo-placeholder" style="display:none;">
+                    SOUL
+                </div>
+            </div>
+            
+            <script>
+            document.addEventListener("DOMContentLoaded", () => {
+                const img = document.getElementById("org-logo-img");
+                const placeholder = document.getElementById("logo-placeholder");
+                const logoUrl = "{{ url_for('serve_logo') }}";
+            
+                if (!img) return;
+            
+                img.onerror = () => {
+                    if (img.src !== logoUrl) {
+                        img.src = logoUrl;
+                    } else {
+                        img.style.display = "none";
+                        if (placeholder) {
+                            placeholder.style.display = "flex";
+                        }
+                    }
+                };
+            });
+            </script>
+            
+            <div class="org-name-container">
+                <h1 class="org-name">Social Organisation for Unity & Leisure</h1>
+                <p class="org-tagline">Staff Portal System</p>
+            </div>
+        </div>
+    </header>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="flash-messages">
+                <div class="flash-message">{{ messages[0] }}</div>
+            </div>
+        {% endif %}
+    {% endwith %}
+    
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

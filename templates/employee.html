@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="welcome-header">
+    <h2>Welcome, {{ current_user.email }}</h2>
+    <div class="nav-links">
+        <a href="/logout" style="background-color: red;">Logout</a>
+    </div>
+</div>
+
+<div class="section">
+    <h3 class="section-title">1. Your Weekly Schedule</h3>
+    <div class="table-wrapper">
+    <table>
+        <thead>
+            <tr><th>Day</th><th>Time Slot</th></tr>
+        </thead>
+        <tbody>
+            {% if shifts %}
+                {% for shift in shifts %}
+                <tr>
+                    <td>
+                        {% if shift.day_of_week == 0 %}Monday
+                        {% elif shift.day_of_week == 1 %}Tuesday
+                        {% elif shift.day_of_week == 2 %}Wednesday
+                        {% elif shift.day_of_week == 3 %}Thursday
+                        {% elif shift.day_of_week == 4 %}Friday
+                        {% elif shift.day_of_week == 5 %}Saturday
+                        {% elif shift.day_of_week == 6 %}Sunday
+                        {% endif %}
+                    </td>
+                    <td>{{ shift.start_time }} - {{ shift.end_time }}</td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="2" style="color: #999; text-align: center;">No shifts assigned. Please contact admin.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<div class="section">
+    <h3 class="section-title">2. Attendance Check-In</h3>
+    {% if not current_session %}
+        <div class="camera-section">
+            <video id="video" width="320" height="240" autoplay class="camera-box"></video>
+            <button id="snap" class="btn">Capture Photo</button>
+            <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
+            <form action="/checkin" method="POST" id="checkinForm">
+                <input type="hidden" name="image" id="image_data">
+                <input type="hidden" name="lat" id="lat">
+                <input type="hidden" name="lng" id="lng">
+                <div id="lateReasonSection" style="display: none; margin-top: 1rem;">
+                    <label for="late_reason" style="display: block; margin-bottom: 0.5rem; font-weight: bold; color: #dc2626;">
+                        Reason for lateness?
+                    </label>
+                    <textarea 
+                        id="late_reason" 
+                        name="late_reason" 
+                        rows="3" 
+                        style="width: 100%; padding: 0.5rem; border: 2px solid #dc2626; border-radius: 8px; font-size: 1rem;"
+                        placeholder="Please provide a reason for being late..."></textarea>
+                </div>
+                <button type="submit" class="btn" id="checkinBtn" disabled>Check In (Photo Required)</button>
+            </form>
+        </div>
+        
+        <script>
+            // Camera Logic
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const snap = document.getElementById('snap');
+            const checkinBtn = document.getElementById('checkinBtn');
+            const imageInput = document.getElementById('image_data');
+            const lateReasonSection = document.getElementById('lateReasonSection');
+            const lateReasonInput = document.getElementById('late_reason');
+            const checkinForm = document.getElementById('checkinForm');
+
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => { video.srcObject = stream; })
+                .catch(err => { alert("Camera access required!"); });
+
+            snap.addEventListener("click", () => {
+                canvas.getContext('2d').drawImage(video, 0, 0, 320, 240);
+                let image_data_url = canvas.toDataURL('image/png');
+                imageInput.value = image_data_url;
+                
+                // Check if user is late
+                checkIfLate();
+                
+                checkinBtn.disabled = false;
+                checkinBtn.innerText = "Confirm Check In";
+                video.style.border = "5px solid #10b981";
+            });
+
+            // Function to check if user is late
+            function checkIfLate() {
+                // Reset late reason field - remove required and hide it initially
+                lateReasonSection.style.display = 'none';
+                lateReasonInput.required = false;
+                lateReasonInput.value = ''; // Clear any previous value
+                checkinBtn.style.backgroundColor = ''; // Reset button color
+                
+                {% if shifts %}
+                const now = new Date();
+                const currentTime = now.getHours() * 60 + now.getMinutes(); // minutes since midnight
+                const today = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+                const dayMapping = {0: 6, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5}; // Convert JS day to our day_of_week
+                const dayOfWeek = dayMapping[today];
+                
+                {% for shift in shifts %}
+                {% if shift.day_of_week is not none %}
+                if ({{ shift.day_of_week }} === dayOfWeek) {
+                    const shiftStart = "{{ shift.start_time }}".split(':');
+                    const shiftStartMinutes = parseInt(shiftStart[0]) * 60 + parseInt(shiftStart[1]);
+                    
+                    if (currentTime > shiftStartMinutes) {
+                        // User is late - show reason field and make it required
+                        lateReasonSection.style.display = 'block';
+                        lateReasonInput.required = true;
+                        checkinBtn.style.backgroundColor = '#dc2626';
+                        checkinBtn.innerText = "Check In (Late - Reason Required)";
+                    } else {
+                        // User is on time or early - ensure reason field is not required
+                        lateReasonSection.style.display = 'none';
+                        lateReasonInput.required = false;
+                        checkinBtn.innerText = "Confirm Check In";
+                    }
+                }
+                {% endif %}
+                {% endfor %}
+                {% endif %}
+            }
+
+            // Validate form submission
+            checkinForm.addEventListener('submit', function(e) {
+                // Check if late reason section is visible
+                const isLateReasonVisible = lateReasonSection.style.display === 'block' || 
+                                          lateReasonSection.style.display === '' ||
+                                          window.getComputedStyle(lateReasonSection).display !== 'none';
+                
+                if (isLateReasonVisible) {
+                    // User is late - validate reason is provided
+                    if (!lateReasonInput.value.trim()) {
+                        e.preventDefault();
+                        alert('Please provide a reason for lateness!');
+                        lateReasonInput.focus();
+                        return false;
+                    }
+                } else {
+                    // User is not late - ensure required attribute is removed and clear the value
+                    lateReasonInput.required = false;
+                    lateReasonInput.removeAttribute('required');
+                    lateReasonInput.value = ''; // Clear the value so it doesn't get sent
+                }
+            });
+
+            // Location Logic - Capture both latitude and longitude
+            navigator.geolocation.getCurrentPosition(pos => {
+                document.getElementById('lat').value = pos.coords.latitude;
+                document.getElementById('lng').value = pos.coords.longitude;
+            }, err => {
+                alert("Location access required for check-in!");
+            });
+        </script>
+    {% else %}
+        <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+            <p style="font-size: 1.1rem; margin-bottom: 1rem;">
+                <strong>Checked in since:</strong> {{ current_session.check_in_time }}
+            </p>
+            <form action="/checkout" method="POST" id="checkoutForm">
+                <input type="hidden" name="lat" id="checkout_lat">
+                <input type="hidden" name="lng" id="checkout_lng">
+                <button type="submit" class="btn btn-danger">Check Out</button>
+            </form>
+        </div>
+        <script>
+            // Capture location for checkout
+            navigator.geolocation.getCurrentPosition(pos => {
+                document.getElementById('checkout_lat').value = pos.coords.latitude;
+                document.getElementById('checkout_lng').value = pos.coords.longitude;
+            }, err => {
+                console.warn("Location access failed for checkout:", err);
+            });
+        </script>
+    {% endif %}
+</div>
+{% endblock %}

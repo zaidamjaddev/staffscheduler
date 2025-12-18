@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+    <h2>Admin Portal</h2>
+    <div class="nav-links">
+        <a href="/logout">Logout</a>
+        <a href="/export" class="btn btn-secondary">Export to Excel</a>
+    </div>
+</div>
+
+<div class="section">
+    <h3 class="section-title">1. Create New Employee Account</h3>
+    <form method="POST">
+        <div class="form-group">
+            <label for="create_username">Username</label>
+            <input type="text" id="create_username" name="create_username" placeholder="john_doe" required>
+        </div>
+        <div class="form-group">
+            <label for="create_email">Email</label>
+            <input type="email" id="create_email" name="create_email" placeholder="staff@example.com" required>
+        </div>
+        <div class="form-group">
+            <label for="create_password">Password</label>
+            <input type="text" id="create_password" name="create_password" placeholder="Password123" required>
+        </div>
+        <button type="submit" class="btn btn-success">Create Employee</button>
+    </form>
+</div>
+
+<div class="section">
+    <h3 class="section-title">2. Allocate Weekly Shift</h3>
+    <form method="POST" id="shiftForm">
+        <div class="form-group">
+            <label for="user_id">Employee</label>
+            <select id="user_id" name="user_id" required>
+                {% for emp in employees %}
+                <option value="{{ emp.id|string }}">{{ emp.username if emp.username else 'N/A' }} ({{ emp.email }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Select Days of Week <span style="font-size: 0.85rem; color: #6b7280;">(Select multiple)</span></label>
+            <div class="days-checkbox-container">
+                <label class="day-checkbox-label">
+                    <input type="checkbox" name="days" value="0" class="day-checkbox">
+                    <span class="day-checkbox-text">Monday</span>
+                </label>
+                <label class="day-checkbox-label">
+                    <input type="checkbox" name="days" value="1" class="day-checkbox">
+                    <span class="day-checkbox-text">Tuesday</span>
+                </label>
+                <label class="day-checkbox-label">
+                    <input type="checkbox" name="days" value="2" class="day-checkbox">
+                    <span class="day-checkbox-text">Wednesday</span>
+                </label>
+                <label class="day-checkbox-label">
+                    <input type="checkbox" name="days" value="3" class="day-checkbox">
+                    <span class="day-checkbox-text">Thursday</span>
+                </label>
+                <label class="day-checkbox-label">
+                    <input type="checkbox" name="days" value="4" class="day-checkbox">
+                    <span class="day-checkbox-text">Friday</span>
+                </label>
+                <label class="day-checkbox-label">
+                    <input type="checkbox" name="days" value="5" class="day-checkbox">
+                    <span class="day-checkbox-text">Saturday</span>
+                </label>
+                <label class="day-checkbox-label">
+                    <input type="checkbox" name="days" value="6" class="day-checkbox">
+                    <span class="day-checkbox-text">Sunday</span>
+                </label>
+            </div>
+            <small style="color: #6b7280; display: block; margin-top: 0.5rem;">Select one or more days to assign the same time slot</small>
+        </div>
+        <div class="form-group">
+            <label for="start">Start Time</label>
+            <input type="time" id="start" name="start" required>
+        </div>
+        <div class="form-group">
+            <label for="end">End Time</label>
+            <input type="time" id="end" name="end" required>
+        </div>
+        <button type="submit" class="btn">Allocate Shifts</button>
+    </form>
+    <script>
+        document.getElementById('shiftForm').addEventListener('submit', function(e) {
+            const checkedDays = document.querySelectorAll('input[name="days"]:checked');
+            if (checkedDays.length === 0) {
+                e.preventDefault();
+                alert('Please select at least one day!');
+                return false;
+            }
+        });
+    </script>
+</div>
+
+<div class="section">
+    <h3 class="section-title">Employee Weekly Schedules</h3>
+    <div class="table-wrapper">
+    <table>
+        <thead>
+            <tr><th>Employee</th><th>Day</th><th>Time Slot</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+            {% for emp in employees %}
+                {% set emp_shifts = shifts_by_employee.get(emp.id|string, []) %}
+                {% if emp_shifts %}
+                    {% for shift in emp_shifts %}
+                    <tr>
+                        <td>
+                            <strong>{{ emp.username if emp.username else 'N/A' }}</strong><br>
+                            <small style="color: #6b7280;">{{ emp.email }}</small>
+                        </td>
+                        <td>
+                            {% if shift.day_of_week == 0 %}Monday
+                            {% elif shift.day_of_week == 1 %}Tuesday
+                            {% elif shift.day_of_week == 2 %}Wednesday
+                            {% elif shift.day_of_week == 3 %}Thursday
+                            {% elif shift.day_of_week == 4 %}Friday
+                            {% elif shift.day_of_week == 5 %}Saturday
+                            {% elif shift.day_of_week == 6 %}Sunday
+                            {% endif %}
+                        </td>
+                        <td>{{ shift.start_time }} - {{ shift.end_time }}</td>
+                        <td>
+                            <form method="POST" class="delete-form" onsubmit="return confirm('Delete this shift?');">
+                                <input type="hidden" name="delete_shift_id" value="{{ shift.id|string }}">
+                                <button type="submit" class="btn-delete" title="Delete shift">🗑️</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td>
+                            <strong>{{ emp.username if emp.username else 'N/A' }}</strong><br>
+                            <small style="color: #6b7280;">{{ emp.email }}</small>
+                        </td>
+                        <td colspan="3" style="color: #999;">No shifts assigned</td>
+                    </tr>
+                {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<div class="section">
+    <h3 class="section-title">3. Attendance Records</h3>
+    <div class="table-wrapper">
+    <table>
+        <thead>
+            <tr>
+                <th>Employee</th>
+                <th>Check In Photo</th>
+                <th>Check In Time</th>
+                <th>Check In Location</th>
+                <th>Check Out Time</th>
+                <th>Check Out Location</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for att in attendances %}
+            <tr>
+                <td>
+                    <strong>{{ att.user.username if att.user.username else 'N/A' }}</strong><br>
+                    <small style="color: #6b7280;">{{ att.user.email }}</small>
+                </td>
+                <td class="photo-cell">
+                    {% if att.check_in_photo %}
+                        <img src="{{ att.check_in_photo }}" 
+                             alt="Check-in photo" 
+                             class="checkin-thumbnail"
+                             onclick="openPhotoModal(this.src, '{{ att.user.username if att.user.username else att.user.email }}', '{{ att.check_in_time.strftime('%Y-%m-%d %H:%M:%S') if att.check_in_time else 'N/A' }}')"
+                             style="cursor: pointer;"
+                             title="Click to enlarge">
+                    {% else %}
+                        <span style="color: #999;">No photo</span>
+                    {% endif %}
+                </td>
+                <td>{{ att.check_in_time.strftime('%Y-%m-%d %H:%M:%S') if att.check_in_time else 'N/A' }}</td>
+                <td class="location-cell">
+                    {% if att.check_in_latitude is not none and att.check_in_longitude is not none %}
+                        <div class="location-info">
+                            <div class="location-coords">
+                                <strong>Lat:</strong> {{ "%.6f"|format(att.check_in_latitude) }}<br>
+                                <strong>Lng:</strong> {{ "%.6f"|format(att.check_in_longitude) }}
+                            </div>
+                            <a href="https://www.google.com/maps?q={{ att.check_in_latitude }},{{ att.check_in_longitude }}" target="_blank" class="location-link" title="View on Google Maps">
+                                📍 View Map
+                            </a>
+                        </div>
+                    {% else %}
+                        <span style="color: #999;">N/A</span>
+                    {% endif %}
+                </td>
+                <td>{{ att.check_out_time.strftime('%Y-%m-%d %H:%M:%S') if att.check_out_time else 'N/A' }}</td>
+                <td class="location-cell">
+                    {% if att.check_out_latitude is not none and att.check_out_longitude is not none %}
+                        <div class="location-info">
+                            <div class="location-coords">
+                                <strong>Lat:</strong> {{ "%.6f"|format(att.check_out_latitude) }}<br>
+                                <strong>Lng:</strong> {{ "%.6f"|format(att.check_out_longitude) }}
+                            </div>
+                            <a href="https://www.google.com/maps?q={{ att.check_out_latitude }},{{ att.check_out_longitude }}" target="_blank" class="location-link" title="View on Google Maps">
+                                📍 View Map
+                            </a>
+                        </div>
+                    {% else %}
+                        <span style="color: #999;">N/A</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if att.is_late %}
+                        {% if att.admin_rejected %}
+                            <span class="status-late">LATE <span class="status-rejected">(Rejected)</span></span>
+                        {% elif att.admin_approved %}
+                            <span class="status-late">LATE <span class="status-approved">(Approved)</span></span>
+                        {% else %}
+                            <span class="status-late">LATE <span class="status-pending">(Pending Approval)</span></span>
+                        {% endif %}
+                        {% if att.late_reason %}
+                            <br><small style="color: #6b7280; display: block; margin-top: 4px;"><strong>Reason:</strong> {{ att.late_reason }}</small>
+                        {% endif %}
+                        {% if not att.admin_approved and not att.admin_rejected %}
+                            <div style="margin-top: 8px;">
+                                <form method="POST" action="/approve_attendance/{{ att.id|string }}" style="display: inline-block;">
+                                    <button type="submit" class="btn-approve" onclick="return confirm('Approve this late entry?');">✓ Approve</button>
+                                </form>
+                                <form method="POST" action="/reject_attendance/{{ att.id|string }}" style="display: inline-block; margin-left: 8px;">
+                                    <button type="submit" class="btn-reject" onclick="return confirm('Reject this late entry?');">✗ Reject</button>
+                                </form>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <span class="status-ontime">On Time</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<!-- Photo Modal -->
+<div id="photoModal" class="modal" onclick="closePhotoModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <span class="modal-close" onclick="closePhotoModal()">&times;</span>
+        <div class="modal-header">
+            <h3 id="modalEmployeeName"></h3>
+            <p id="modalCheckInTime"></p>
+        </div>
+        <img id="modalPhoto" src="" alt="Check-in photo">
+    </div>
+</div>
+
+<style>
+.photo-cell {
+    padding: 8px;
+    text-align: center;
+}
+
+.checkin-thumbnail {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 2px solid #e5e7eb;
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+.checkin-thumbnail:hover {
+    transform: scale(1.1);
+    border-color: #3b82f6;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-content {
+    position: relative;
+    background-color: #fff;
+    margin: 5% auto;
+    padding: 0;
+    width: 90%;
+    max-width: 600px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    animation: slideDown 0.3s;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h3 {
+    margin: 0 0 8px 0;
+    color: #1f2937;
+    font-size: 1.25rem;
+}
+
+.modal-header p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.modal-close {
+    position: absolute;
+    right: 15px;
+    top: 15px;
+    color: #6b7280;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s;
+    z-index: 1;
+}
+
+.modal-close:hover {
+    color: #1f2937;
+}
+
+#modalPhoto {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 0 0 12px 12px;
+}
+
+.status-approved {
+    color: #10b981;
+    font-weight: bold;
+}
+
+.status-rejected {
+    color: #dc2626;
+    font-weight: bold;
+}
+
+.btn-approve {
+    background-color: #10b981;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.btn-approve:hover {
+    background-color: #059669;
+}
+
+.btn-reject {
+    background-color: #dc2626;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.btn-reject:hover {
+    background-color: #b91c1c;
+}
+</style>
+
+<script>
+function openPhotoModal(photoSrc, employeeName, checkInTime) {
+    document.getElementById('modalPhoto').src = photoSrc;
+    document.getElementById('modalEmployeeName').textContent = employeeName;
+    document.getElementById('modalCheckInTime').textContent = 'Check-in: ' + checkInTime;
+    document.getElementById('photoModal').style.display = 'block';
+}
+
+function closePhotoModal() {
+    document.getElementById('photoModal').style.display = 'none';
+}
+
+// Close modal when pressing Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closePhotoModal();
+    }
+});
+</script>
+
+{% endblock %}

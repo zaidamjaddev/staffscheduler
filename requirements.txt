@@ -1,0 +1,7 @@
+Flask
+mongoengine
+Flask-Login
+pandas
+openpyxl
+werkzeug
+python-dotenv
